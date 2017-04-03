@@ -8,7 +8,7 @@ type Bottle = {capacity: int<gal>; filled: int<gal>}
 
 let fillUp bottle = 
     match bottle.filled with
-        | f when f <= bottle.capacity -> {capacity = bottle.capacity; filled = bottle.capacity}
+        | f when f < bottle.capacity -> {capacity = bottle.capacity; filled = bottle.capacity}
         | _ -> bottle
 
 let empty bottle = {capacity = bottle.capacity; filled = 0<gal>}
@@ -36,13 +36,19 @@ let pour dir state =
                 |Left -> state.right
                 |Right -> state.left
     let diff = give.filled - recv.filled
-    
-    let removedQuantity = give.filled - (recv.capacity - recv.filled)
-    let rhs = (recv.capacity - recv.filled)
-    let addedQuantity = min removedQuantity rhs  
-    let updatedRecv = {capacity = recv.capacity;filled = recv.filled + addedQuantity}
-    let updatedGive = {capacity = give.capacity; filled = give.filled - removedQuantity}
-    if updatedGive.filled < 0<gal> || updatedRecv.filled < 0<gal> then state else 
+
+    let qRecvUpdate = min (recv.filled + give.filled) recv.capacity
+    let qGiveUpdate = max 0<gal> (recv.filled + give.filled - recv.capacity)
+
+    let updatedRecv = {capacity = recv.capacity; filled = qRecvUpdate}
+    let updatedGive = {capacity = give.capacity; filled = qGiveUpdate}
+
+    if updatedGive.filled < 0<gal> ||
+         updatedRecv.filled < 0<gal> || 
+         updatedGive.filled > updatedGive.capacity || 
+         updatedRecv.filled > updatedRecv.capacity ||
+         give.filled = 0<gal> 
+         then state else 
     match dir with 
         | Left -> {left = updatedGive; right = updatedRecv}
         | Right -> {left = updatedRecv; right = updatedGive}
@@ -57,6 +63,7 @@ let fill dir state =
         | Right -> {left = state.left; right = fillUp state.right}
 let dumpOut bottle =
     {capacity = bottle.capacity; filled = 0<gal>}
+
 let dump dir state = 
     match dir with
         | Left -> {left = dumpOut state.left; right = state.right}
@@ -74,9 +81,15 @@ let visited : Set<state> = Set.ofList []
 
 let path : List<Action> = []
 
-type PlanStep = {action: Action; which : Direction}
+type PlanStep = {action: Action; which : Direction; name : string}
 
-let possibleSteps = [{action=pour; which = Left}; {action=pour; which=Right}; {action=fill; which=Left}; {action=fill; which=Right}; {action=dump;which=Left}; {action=dump;which=Right}]
+let possibleSteps = [   {action=fill; which=Left; name="Fill Left"}; 
+                        {action=fill; which=Right; name="Fill Right"};
+                        {action=pour; which = Left; name="Pour Left into Right"}; 
+                        {action=pour; which=Right; name="Pour Right into Left"}; 
+
+                         {action=dump;which=Left; name="Dump Left"}; 
+                         {action=dump;which=Right; name="Dump Right"}]
 
 type Plan = List<PlanStep>
 
@@ -105,15 +118,30 @@ let rec solve start goal (visited : Set<state>) (path : Plan) =
 
     attemptSolve possibleSteps
 
-let planStart = {left = {capacity=5<gal>; filled = 0<gal>}; right = {capacity=3<gal>; filled=0<gal>}}
+let planStart = {left = {capacity=4<gal>; filled = 0<gal>}; right = {capacity=3<gal>; filled=0<gal>}}
 
-let desiredRes = 2<gal>
+let desiredRes = 1<gal>
 
 let res = solve planStart desiredRes visited []
 
 let prettyResult res = 
     match res with
-        | Success plan -> plan |> List.iter (fun x -> printfn "%A" x)
+        | Success plan -> plan |> List.iter (fun x -> printfn "%A" x.name)
         | Failure -> printfn "No plan found"
+let rec findPlanResult start plan = 
+    match plan with 
+        | x::xs -> 
+            let action = (x.action x.which)
+            printfn "State is %A -> Action is %A" (start) x.name
+            printfn "Result State is %A" (action start)
+            findPlanResult (action start) xs
+        | [] -> start
+prettyResult res 
 
-prettyResult res
+let extract res =
+    match res with 
+        | Success plan -> plan
+        | Failure -> []
+
+findPlanResult planStart (extract res)
+
