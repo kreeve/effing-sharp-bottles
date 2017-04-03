@@ -120,7 +120,7 @@ let rec solve start goal (visited : Set<state>) (path : Plan) =
 
 let planStart = {left = {capacity=4<gal>; filled = 0<gal>}; right = {capacity=3<gal>; filled=0<gal>}}
 
-let desiredRes = 1<gal>
+let desiredRes = 3<gal>
 
 let res = solve planStart desiredRes visited []
 
@@ -132,8 +132,6 @@ let rec findPlanResult start plan =
     match plan with 
         | x::xs -> 
             let action = (x.action x.which)
-            printfn "State is %A -> Action is %A" (start) x.name
-            printfn "Result State is %A" (action start)
             findPlanResult (action start) xs
         | [] -> start
 prettyResult res 
